@@ -37,7 +37,7 @@ pyproject.toml, uv.lock
 Requires [uv](https://docs.astral.sh/uv/). uv installs Python 3.11 automatically, because PyCaret only supports Python 3.9–3.11.
 
 ```bash
-git clone <this-repo-url>
+git clone https://github.com/moneybanker004/ml-pipeline.git
 cd ml-pipeline
 uv run discovery.py           # both workflows; writes model.joblib and images/ (about 1-2 min)
 uv run fastapi dev main.py    # start the API, then open http://127.0.0.1:8000/docs
