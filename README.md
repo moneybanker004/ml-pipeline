@@ -45,6 +45,14 @@ uv run fastapi dev main.py    # start the API, then open http://127.0.0.1:8000/d
 
 The first `uv run` installs about 150 packages, so it takes a few minutes.
 
+`model.joblib` is already committed, so `main.py` also works without running `discovery.py` first. To test the API, open `/docs`, expand **POST /predict**, click **Try it out**, then **Execute**. The example request is pre-filled. You can also send it from a terminal:
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"age":35,"job":"management","marital":"married","education":"tertiary","default":"no","balance":1500,"housing":"yes","loan":"no","contact":"cellular","day":15,"month":"may","campaign":2,"pdays":-1,"previous":0,"poutcome":"unknown"}'
+```
+
+*macOS:* LightGBM needs the OpenMP runtime. If importing PyCaret fails with a `libomp` error, run `brew install libomp` first.
+
 ---
 
 ## Part 2: Comparing the workflows
@@ -90,11 +98,11 @@ Confusion matrix [rows = actual no/yes, cols = predicted no/yes]
 
 ### Comparison (answers to step 5)
 
-**Which workflow was more efficient?** PyCaret, by a wide margin, in lines of code and in my time. The PyCaret section is **14 lines** and tried 14 models in **64 s**. The scikit-learn section is **about 85 lines**. It fits in 0.1 s, but it tests only one model, and only because PyCaret had already told me which one to build. Writing and debugging the `ColumnTransformer` took far longer than either run time. Comparing 14 models by hand would have meant writing 14 pipelines and a cross-validation loop.
+**Which workflow was more efficient?** PyCaret, clearly. Its section is **14 lines** and compared 14 models in **64 s**. The scikit-learn section is **about 85 lines** and fits in 0.1 s, but it builds only one model, the one PyCaret had already picked. Writing and debugging the `ColumnTransformer` took far longer than either run.
 
-**Why don't the scores match?** PyCaret reports the **average of 10-fold cross-validation** folds on the training data: F1 0.391 (precision 0.382, recall 0.403). My scikit-learn report is a **single held-out test set**: F1 for "yes" 0.278 (precision 0.189, recall 0.526). Even PyCaret's own QDA on its hold-out set (the confusion matrix above: 58 TP, 136 FP, 98 FN) scores precision 0.299, recall 0.372 and F1 0.331, below its CV average. The two workflows also preprocess differently. PyCaret encodes binary columns as 0/1 and does not scale, while I one-hot encode everything and scale. QDA is very sensitive to this: one-hot columns are collinear, which makes QDA's covariance estimates unstable and its probabilities extreme (often exactly 0 or 1).
+**Why don't the scores match?** PyCaret reports the **average of 10-fold cross-validation** on the training data: F1 0.391 (precision 0.382, recall 0.403). My scikit-learn scores come from **one held-out test set**: F1 0.278 for "yes" (precision 0.189, recall 0.526). Even PyCaret's own QDA scores lower on its hold-out set (F1 0.331, from the confusion matrix above). Preprocessing also differs. PyCaret encodes binary columns as 0/1 without scaling, while I one-hot encode everything and scale. QDA is sensitive to collinear one-hot columns.
 
-**Which metric matters most?** **F1 on the "yes" class.** Accuracy is misleading here, because predicting "no" for everyone scores 88.5% and finds zero customers. Recall alone is also not enough: calling everyone gives 100% recall and wastes the whole call budget. A missed subscriber is lost revenue, and a wasted call costs agent time, so the bank needs both precision and recall. F1 balances them. If calls were nearly free, I would shift toward recall.
+**Which metric matters most?** **F1 on the "yes" class.** Predicting "no" for everyone scores 88.5% accuracy and finds no customers. Calling everyone gives 100% recall and wastes the call budget. Missed subscribers lose revenue and wasted calls cost agent time, so F1 balances precision and recall.
 
 ---
 
@@ -146,12 +154,8 @@ For comparison, I also tested changing only `poutcome` to `"success"` (previous 
 
 ## AI use
 
-I used **Claude Code** (an AI coding agent) for this assignment. It wrote the code in `discovery.py` and `main.py`, ran the scripts, took the screenshots and drafted this README. I set it up this way because most of this code is standard boilerplate (PyCaret `setup`/`compare_models`, `ColumnTransformer`, a FastAPI endpoint). My job was to decide what the project should do and to check the results: choosing a dataset where a column has to be dropped (`duration`), choosing the metric, and reading the outputs critically.
+I used **Claude Code** (an AI coding assistant) to write most of the code in `discovery.py` and `main.py`, and to draft this README. I let it write the standard boilerplate, meaning the PyCaret `setup`/`compare_models` calls, the `ColumnTransformer`, and the FastAPI endpoint. I made the decisions: the dataset, dropping `duration`, using F1 as the metric, and the prediction experiment.
 
-**Things the AI got wrong or left out that I had to catch and fix:**
+**What I fixed:** in the first run, PyCaret's Recall column was identical to Accuracy. That is impossible for the rare "yes" class. Because the target was passed as the strings `yes`/`no`, PyCaret was reporting *weighted* averages over both classes (F1 around 0.87). Encoding the target as 1/0 gave the real F1 for "yes", about 0.39, and changed the best model. I also noticed that LightGBM was missing from the comparison table. LightGBM 4.7 crashes inside PyCaret on Windows, so I pinned it to 4.5.
 
-1. **Weighted metrics.** In the first run, PyCaret's Recall column was identical to its Accuracy column (for example, 0.8910 and 0.8910). That cannot happen for the "yes" class on imbalanced data. Because the target was passed as the strings `yes`/`no`, PyCaret reported *weighted* averages over both classes, which made every model look good (F1 around 0.87). Encoding the target as 1 = yes / 0 = no fixed it. The real F1 for "yes" is about 0.39, and the ranking changed from LDA first to QDA first.
-2. **LightGBM silently missing.** The first comparison table had no LightGBM row at all, and the scikit-learn part crashed with `OSError: access violation`. LightGBM 4.7 crashes inside PyCaret on Windows, and PyCaret just drops models that fail. Pinning `lightgbm>=4.5,<4.6` in `pyproject.toml` fixed it, and LightGBM now appears in the table.
-3. **Project setup.** `uv init` first created a packaged `src/` layout, and the install failed because the folder path was too long for Windows. I recreated the project as a plain app in a short path.
-
-**How I checked the work:** compared PyCaret's metric columns against each other (which is how I spotted problem 1), confirmed that the sklearn classification report's support counts match a 30% stratified split (1,201 + 156 = 1,357), sent valid and invalid requests to `/predict` (an `age` of 5 correctly returns a 422 validation error), and compared the month and `poutcome` explanations against subscription rates in the raw data.
+**How I checked:** I compared the metric columns against each other, confirmed that the test-set counts match a 30% stratified split (1,201 + 156), sent valid and invalid requests to `/predict`, and checked the prediction explanation against subscription rates in the raw data.

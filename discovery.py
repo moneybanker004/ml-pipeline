@@ -65,8 +65,10 @@ print(comparison.to_string(), "\n")
 best = top3[0]
 print(f"PyCaret best model: {type(best).__name__}")
 
-# save=str saves "Confusion Matrix.png" into that folder instead of showing it
-plot_model(best, plot="confusion_matrix", save=str(IMAGES))
+# save=True writes "Confusion Matrix.png" to the working folder instead of
+# opening a window; move it into images/ with the other screenshots.
+saved_plot = plot_model(best, plot="confusion_matrix", save=True)
+Path(saved_plot).replace(IMAGES / Path(saved_plot).name)
 
 pycaret_seconds = time.perf_counter() - pycaret_start
 print(f"PyCaret workflow time: {pycaret_seconds:.1f} s\n")
