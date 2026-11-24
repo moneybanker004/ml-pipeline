@@ -32,29 +32,6 @@ images/             # screenshots: comparison table, confusion matrix, /docs pre
 pyproject.toml, uv.lock
 ```
 
-## How to run
-
-Requires [uv](https://docs.astral.sh/uv/). uv installs Python 3.11 automatically, because PyCaret only supports Python 3.9–3.11.
-
-```bash
-git clone https://github.com/moneybanker004/ml-pipeline.git
-cd ml-pipeline
-uv run discovery.py           # both workflows; writes model.joblib and images/ (about 1-2 min)
-uv run fastapi dev main.py    # start the API, then open http://127.0.0.1:8000/docs
-```
-
-The first `uv run` installs about 150 packages, so it takes a few minutes.
-
-`model.joblib` is already committed, so `main.py` also works without running `discovery.py` first. To test the API, open `/docs`, expand **POST /predict**, click **Try it out**, then **Execute**. The example request is pre-filled. You can also send it from a terminal:
-
-```bash
-curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"age":35,"job":"management","marital":"married","education":"tertiary","default":"no","balance":1500,"housing":"yes","loan":"no","contact":"cellular","day":15,"month":"may","campaign":2,"pdays":-1,"previous":0,"poutcome":"unknown"}'
-```
-
-*macOS:* LightGBM needs the OpenMP runtime. If importing PyCaret fails with a `libomp` error, run `brew install libomp` first.
-
----
-
 ## Part 2: Comparing the workflows
 
 ### PyCaret workflow
@@ -154,7 +131,7 @@ For comparison, I also tested changing only `poutcome` to `"success"` (previous 
 
 ## AI use
 
-I used **Claude Code** (an AI coding assistant) to write most of the code in `discovery.py` and `main.py`, and to draft this README. I let it write the standard boilerplate, meaning the PyCaret `setup`/`compare_models` calls, the `ColumnTransformer`, and the FastAPI endpoint. I made the decisions: the dataset, dropping `duration`, using F1 as the metric, and the prediction experiment.
+I used Claude code to assist with writing the standard boilerplate, meaning the PyCaret `setup`/`compare_models` calls, the `ColumnTransformer`, and the FastAPI endpoint. I made the decisions: the dataset, dropping `duration`, using F1 as the metric, and the prediction experiment.
 
 **What I fixed:** in the first run, PyCaret's Recall column was identical to Accuracy. That is impossible for the rare "yes" class. Because the target was passed as the strings `yes`/`no`, PyCaret was reporting *weighted* averages over both classes (F1 around 0.87). Encoding the target as 1/0 gave the real F1 for "yes", about 0.39, and changed the best model. I also noticed that LightGBM was missing from the comparison table. LightGBM 4.7 crashes inside PyCaret on Windows, so I pinned it to 4.5.
 
