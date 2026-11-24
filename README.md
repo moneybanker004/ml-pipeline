@@ -59,7 +59,7 @@ PyCaret ranked **Quadratic Discriminant Analysis (QDA)** best on F1, followed by
 
 ![PyCaret confusion matrix](images/Confusion%20Matrix.png)
 
-**PyCaret section run time: 64.1 s** (measured with `time.perf_counter()` in `discovery.py`; 124 s on the first, cold run).
+**PyCaret section run time: 64.1 s** (measured with `time.perf_counter()` in `discovery.py` on a warm run; 124–155 s on a cold first run from a fresh clone).
 
 ### scikit-learn workflow
 
